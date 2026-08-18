@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Log in — Ledger</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="wrap">
+    <a href="index.html" class="brand">Ledger <span class="brand-mark">vol. 01</span></a>
+    <nav class="mainnav" data-nav></nav>
+  </div>
+</header>
+
+<section class="auth-shell">
+  <div class="wrap">
+    <div class="card">
+      <span class="eyebrow">Welcome back</span>
+      <h1 style="font-size:1.6rem;">Log in to Ledger</h1>
+
+      <div id="banner" class="banner banner-error"></div>
+
+      <form id="login-form" novalidate>
+        <div class="field" id="field-email">
+          <label for="email">Email</label>
+          <input type="email" id="email" autocomplete="email" placeholder="you@example.com">
+          <div class="field-error">Enter a valid email address.</div>
+        </div>
+        <div class="field" id="field-password">
+          <label for="password">Password</label>
+          <input type="password" id="password" autocomplete="current-password" placeholder="••••••••">
+          <div class="field-error">Enter your password.</div>
+        </div>
+        <button type="submit" class="btn btn-stamp btn-full">Log in</button>
+      </form>
+
+      <p class="form-note">No account yet? <a href="register.html">Register one</a>.</p>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap" style="width:100%;">Ledger — a running record</div>
+</footer>
+
+<script src="app.js"></script>
+<script>
+  renderNav('login');
+
+  // If already logged in, go straight to the dashboard.
+  if(currentUser()){ window.location.href = 'dashboard.html'; }
+
+  const form = document.getElementById('login-form');
+  const banner = document.getElementById('banner');
+
+  form.addEventListener('submit', (e) => {
+    e.preventDefault();
+    banner.classList.remove('show');
+
+    const email = document.getElementById('email').value.trim().toLowerCase();
+    const password = document.getElementById('password').value;
+
+    let valid = true;
+    const emailOk = /^\S+@\S+\.\S+$/.test(email);
+    document.getElementById('field-email').classList.toggle('error', !emailOk);
+    if(!emailOk) valid = false;
+
+    document.getElementById('field-password').classList.toggle('error', password.length === 0);
+    if(password.length === 0) valid = false;
+
+    if(!valid) return;
+
+    const user = Store.users().find(u => u.email === email);
+    if(!user || user.password !== password){
+      banner.textContent = 'That email and password don\u2019t match an account here.';
+      banner.classList.add('show');
+      return;
+    }
+
+    Store.setSession(email);
+    window.location.href = 'dashboard.html';
+  });
+</script>
+</body>
+</html>

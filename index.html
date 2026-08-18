@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ledger — a blog worth keeping</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="wrap">
+    <a href="index.html" class="brand">Ledger <span class="brand-mark">vol. 01</span></a>
+    <nav class="mainnav" data-nav></nav>
+  </div>
+</header>
+
+<section class="hero">
+  <div class="wrap">
+    <span class="eyebrow">Entries, in order</span>
+    <h1>Every post, numbered and kept in sequence.</h1>
+    <p class="lede">No algorithm reshuffles the order here. Write something, and it takes its place in the running ledger — entry by entry, exactly as it happened.</p>
+  </div>
+</section>
+
+<section class="ledger">
+  <div class="wrap">
+    <div class="ledger-head">
+      <span>Running order</span>
+      <span id="entry-count">0 entries</span>
+    </div>
+    <div id="entries"></div>
+    <div id="empty" class="empty-state" style="display:none;">
+      No entries yet. <a href="register.html">Register</a> and write the first one.
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap" style="display:flex; justify-content:space-between; width:100%;">
+    <span>Ledger — a running record</span>
+    <span id="footer-count"></span>
+  </div>
+</footer>
+
+<script src="app.js"></script>
+<script>
+  renderNav('home');
+
+  function render(){
+    const posts = Store.posts().slice().sort((a,b) => b.createdAt - a.createdAt);
+    const wrap = document.getElementById('entries');
+    const empty = document.getElementById('empty');
+
+    document.getElementById('entry-count').textContent = posts.length + (posts.length === 1 ? ' entry' : ' entries');
+    document.getElementById('footer-count').textContent = posts.length + (posts.length === 1 ? ' entry logged' : ' entries logged');
+
+    if(posts.length === 0){
+      wrap.innerHTML = '';
+      empty.style.display = 'block';
+      return;
+    }
+    empty.style.display = 'none';
+
+    wrap.innerHTML = posts.map((p, i) => {
+      const num = String(posts.length - i).padStart(3, '0');
+      return `
+        <article class="entry">
+          <div class="num">${num}</div>
+          <div>
+            <h2 class="title"><a href="#" data-toggle="${p.id}">${escapeHtml(p.title)}</a></h2>
+            <p class="excerpt" data-excerpt="${p.id}">${escapeHtml(excerpt(p.body))}</p>
+            <p class="excerpt" data-full="${p.id}" style="display:none; white-space:pre-line;">${escapeHtml(p.body)}</p>
+            <div class="meta">by ${escapeHtml(p.author)} · <span class="tag">#${escapeHtml(p.tag || 'general')}</span></div>
+          </div>
+          <div class="side">${timeAgo(p.createdAt)}</div>
+        </article>`;
+    }).join('');
+
+    wrap.querySelectorAll('[data-toggle]').forEach(a => {
+      a.addEventListener('click', (e) => {
+        e.preventDefault();
+        const id = a.dataset.toggle;
+        const excerptEl = wrap.querySelector(`[data-excerpt="${id}"]`);
+        const fullEl = wrap.querySelector(`[data-full="${id}"]`);
+        const open = fullEl.style.display !== 'none';
+        fullEl.style.display = open ? 'none' : 'block';
+        excerptEl.style.display = open ? 'block' : 'none';
+      });
+    });
+  }
+
+  render();
+</script>
+</body>
+</html>
