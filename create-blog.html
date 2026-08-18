@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Write — Ledger</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="wrap">
+    <a href="index.html" class="brand">Ledger <span class="brand-mark">vol. 01</span></a>
+    <nav class="mainnav" data-nav></nav>
+  </div>
+</header>
+
+<section class="hero" style="padding-bottom:0; border-bottom:none;">
+  <div class="wrap">
+    <span class="eyebrow">New entry</span>
+    <h1 style="font-size:2.2rem;">Add a line to the ledger.</h1>
+  </div>
+</section>
+
+<section class="auth-shell" style="max-width:640px; padding-top:32px;">
+  <div class="wrap">
+    <div class="card">
+      <div id="banner" class="banner banner-error"></div>
+
+      <form id="post-form" novalidate>
+        <div class="field" id="field-title">
+          <label for="title">Title</label>
+          <input type="text" id="title" placeholder="What are you writing about?">
+          <div class="field-error">Give the entry a title.</div>
+        </div>
+
+        <div class="field" id="field-tag">
+          <label for="tag">Tag</label>
+          <input type="text" id="tag" placeholder="e.g. css, career, notes">
+        </div>
+
+        <div class="field" id="field-body">
+          <label for="body">Entry</label>
+          <textarea id="body" rows="10" placeholder="Write the post here."></textarea>
+          <div class="field-error">The entry needs some words in it.</div>
+        </div>
+        <div class="char-count"><span id="count">0</span> characters</div>
+
+        <div style="display:flex; gap:12px;">
+          <button type="submit" class="btn btn-stamp">Publish entry</button>
+          <a href="dashboard.html" class="btn btn-ghost">Cancel</a>
+        </div>
+      </form>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap" style="width:100%;">Ledger — a running record</div>
+</footer>
+
+<script src="app.js"></script>
+<script>
+  renderNav('create');
+  const user = requireAuth();
+
+  const bodyField = document.getElementById('body');
+  const count = document.getElementById('count');
+  bodyField.addEventListener('input', () => { count.textContent = bodyField.value.length; });
+
+  const form = document.getElementById('post-form');
+  const banner = document.getElementById('banner');
+
+  form.addEventListener('submit', (e) => {
+    e.preventDefault();
+    banner.classList.remove('show');
+
+    const title = document.getElementById('title').value.trim();
+    const tag = document.getElementById('tag').value.trim().replace(/^#/, '') || 'general';
+    const body = bodyField.value.trim();
+
+    let valid = true;
+    document.getElementById('field-title').classList.toggle('error', title.length === 0);
+    if(title.length === 0) valid = false;
+
+    document.getElementById('field-body').classList.toggle('error', body.length < 10);
+    if(body.length < 10) valid = false;
+
+    if(!valid) return;
+
+    const posts = Store.posts();
+    posts.push({
+      id: cryptoId(),
+      title,
+      body,
+      tag,
+      author: user.name || user.email,
+      createdAt: Date.now()
+    });
+    Store.savePosts(posts);
+
+    window.location.href = 'dashboard.html';
+  });
+</script>
+</body>
+</html>

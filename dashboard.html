@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard — Ledger</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="wrap">
+    <a href="index.html" class="brand">Ledger <span class="brand-mark">vol. 01</span></a>
+    <nav class="mainnav" data-nav></nav>
+  </div>
+</header>
+
+<div class="wrap">
+  <div class="dash-head">
+    <div>
+      <span class="section-title">Your desk</span>
+      <h1 id="greeting" style="font-size:2rem;">Welcome back.</h1>
+    </div>
+    <a href="create-blog.html" class="btn btn-accent">Write a new entry</a>
+  </div>
+
+  <div class="stat-row">
+    <div class="stat"><span class="num" id="stat-total">0</span><span class="label">Entries written</span></div>
+    <div class="stat"><span class="num" id="stat-words">0</span><span class="label">Total words</span></div>
+    <div class="stat"><span class="num" id="stat-latest">—</span><span class="label">Last entry</span></div>
+  </div>
+
+  <div class="ledger-head" style="margin-top:24px;">
+    <span>Your entries</span>
+    <span id="entry-count">0</span>
+  </div>
+  <div id="entries"></div>
+  <div id="empty" class="empty-state" style="display:none;">
+    You haven&rsquo;t written anything yet. <a href="create-blog.html">Start your first entry</a>.
+  </div>
+</div>
+
+<footer>
+  <div class="wrap" style="width:100%;">Ledger — a running record</div>
+</footer>
+
+<script src="app.js"></script>
+<script>
+  renderNav('dashboard');
+  const user = requireAuth();
+
+  function myPosts(){
+    const name = user.name || user.email;
+    return Store.posts().filter(p => p.author === name).sort((a,b) => b.createdAt - a.createdAt);
+  }
+
+  function render(){
+    if(!user) return;
+    document.getElementById('greeting').textContent = 'Welcome back, ' + (user.name || user.email).split(' ')[0] + '.';
+
+    const posts = myPosts();
+    const wrap = document.getElementById('entries');
+    const empty = document.getElementById('empty');
+
+    document.getElementById('stat-total').textContent = posts.length;
+    const totalWords = posts.reduce((sum, p) => sum + p.body.trim().split(/\s+/).filter(Boolean).length, 0);
+    document.getElementById('stat-words').textContent = totalWords;
+    document.getElementById('stat-latest').textContent = posts.length ? timeAgo(posts[0].createdAt) : '—';
+    document.getElementById('entry-count').textContent = posts.length;
+
+    if(posts.length === 0){
+      wrap.innerHTML = '';
+      empty.style.display = 'block';
+      return;
+    }
+    empty.style.display = 'none';
+
+    wrap.innerHTML = posts.map((p, i) => {
+      const num = String(posts.length - i).padStart(3, '0');
+      return `
+        <article class="entry">
+          <div class="num">${num}</div>
+          <div>
+            <h2 class="title">${escapeHtml(p.title)}</h2>
+            <p class="excerpt">${escapeHtml(excerpt(p.body))}</p>
+            <div class="meta"><span class="tag">#${escapeHtml(p.tag || 'general')}</span> · ${timeAgo(p.createdAt)}</div>
+            <div class="dash-entry-actions">
+              <button data-delete="${p.id}">Delete entry</button>
+            </div>
+          </div>
+          <div class="side"></div>
+        </article>`;
+    }).join('');
+
+    wrap.querySelectorAll('[data-delete]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        if(!confirm('Remove this entry from the ledger? This can\u2019t be undone.')) return;
+        const remaining = Store.posts().filter(p => p.id !== btn.dataset.delete);
+        Store.savePosts(remaining);
+        render();
+      });
+    });
+  }
+
+  render();
+</script>
+</body>
+</html>
