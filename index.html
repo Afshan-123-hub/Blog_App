@@ -47,47 +47,53 @@
 <script>
   renderNav('home');
 
-  function render(){
-    const posts = Store.posts().slice().sort((a,b) => b.createdAt - a.createdAt);
-    const wrap = document.getElementById('entries');
-    const empty = document.getElementById('empty');
+  async function render() {
+    try {
+      const posts = await getAllPosts();
+      const wrap = document.getElementById('entries');
+      const empty = document.getElementById('empty');
 
-    document.getElementById('entry-count').textContent = posts.length + (posts.length === 1 ? ' entry' : ' entries');
-    document.getElementById('footer-count').textContent = posts.length + (posts.length === 1 ? ' entry logged' : ' entries logged');
+      document.getElementById('entry-count').textContent = posts.length + (posts.length === 1 ? ' entry' : ' entries');
+      document.getElementById('footer-count').textContent = posts.length + (posts.length === 1 ? ' entry logged' : ' entries logged');
 
-    if(posts.length === 0){
-      wrap.innerHTML = '';
-      empty.style.display = 'block';
-      return;
-    }
-    empty.style.display = 'none';
+      if(posts.length === 0){
+        wrap.innerHTML = '';
+        empty.style.display = 'block';
+        return;
+      }
+      empty.style.display = 'none';
 
-    wrap.innerHTML = posts.map((p, i) => {
-      const num = String(posts.length - i).padStart(3, '0');
-      return `
-        <article class="entry">
-          <div class="num">${num}</div>
-          <div>
-            <h2 class="title"><a href="#" data-toggle="${p.id}">${escapeHtml(p.title)}</a></h2>
-            <p class="excerpt" data-excerpt="${p.id}">${escapeHtml(excerpt(p.body))}</p>
-            <p class="excerpt" data-full="${p.id}" style="display:none; white-space:pre-line;">${escapeHtml(p.body)}</p>
-            <div class="meta">by ${escapeHtml(p.author)} · <span class="tag">#${escapeHtml(p.tag || 'general')}</span></div>
-          </div>
-          <div class="side">${timeAgo(p.createdAt)}</div>
-        </article>`;
-    }).join('');
+      wrap.innerHTML = posts.map((p, i) => {
+        const num = String(posts.length - i).padStart(3, '0');
+        const createdAt = new Date(p.createdAt).getTime();
+        return `
+          <article class="entry">
+            <div class="num">${num}</div>
+            <div>
+              <h2 class="title"><a href="#" data-toggle="${p._id}">${escapeHtml(p.title)}</a></h2>
+              <p class="excerpt" data-excerpt="${p._id}">${escapeHtml(excerpt(p.body))}</p>
+              <p class="excerpt" data-full="${p._id}" style="display:none; white-space:pre-line;">${escapeHtml(p.body)}</p>
+              <div class="meta">by ${escapeHtml(p.author)} · <span class="tag">#${escapeHtml(p.tag || 'general')}</span></div>
+            </div>
+            <div class="side">${timeAgo(createdAt)}</div>
+          </article>`;
+      }).join('');
 
-    wrap.querySelectorAll('[data-toggle]').forEach(a => {
-      a.addEventListener('click', (e) => {
-        e.preventDefault();
-        const id = a.dataset.toggle;
-        const excerptEl = wrap.querySelector(`[data-excerpt="${id}"]`);
-        const fullEl = wrap.querySelector(`[data-full="${id}"]`);
-        const open = fullEl.style.display !== 'none';
-        fullEl.style.display = open ? 'none' : 'block';
-        excerptEl.style.display = open ? 'block' : 'none';
+      wrap.querySelectorAll('[data-toggle]').forEach(a => {
+        a.addEventListener('click', (e) => {
+          e.preventDefault();
+          const id = a.dataset.toggle;
+          const excerptEl = wrap.querySelector(`[data-excerpt="${id}"]`);
+          const fullEl = wrap.querySelector(`[data-full="${id}"]`);
+          const open = fullEl.style.display !== 'none';
+          fullEl.style.display = open ? 'none' : 'block';
+          excerptEl.style.display = open ? 'block' : 'none';
+        });
       });
-    });
+    } catch (error) {
+      console.error('Error loading posts:', error);
+      document.getElementById('entries').innerHTML = '<p style="color: var(--danger);">Error loading posts. Make sure the backend server is running.</p>';
+    }
   }
 
   render();

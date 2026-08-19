@@ -1,63 +1,139 @@
 /* ==========================================================================
-   LEDGER — shared client-side logic.
-   No backend: users and posts are persisted in localStorage so the whole
-   flow (register -> login -> write -> dashboard) actually works end to end.
+   LEDGER — shared client-side logic with Backend API
+   Now connected to Node.js + Express + MongoDB backend
    ========================================================================== */
 
-const DB_USERS = 'ledger_users';
-const DB_POSTS = 'ledger_posts';
+const API_URL = 'http://localhost:5000/api';
 const DB_SESSION = 'ledger_session';
+const DB_TOKEN = 'ledger_token';
 
+// ========== Store (localStorage for session only) ==========
 const Store = {
-  users(){ return JSON.parse(localStorage.getItem(DB_USERS) || '[]'); },
-  saveUsers(u){ localStorage.setItem(DB_USERS, JSON.stringify(u)); },
-
-  posts(){ return JSON.parse(localStorage.getItem(DB_POSTS) || '[]'); },
-  savePosts(p){ localStorage.setItem(DB_POSTS, JSON.stringify(p)); },
-
   session(){ return JSON.parse(localStorage.getItem(DB_SESSION) || 'null'); },
   setSession(email){ localStorage.setItem(DB_SESSION, JSON.stringify({ email, at: Date.now() })); },
-  clearSession(){ localStorage.removeItem(DB_SESSION); },
-
-  seedIfEmpty(){
-    if(Store.posts().length === 0){
-      const seed = [
-        {
-          id: cryptoId(),
-          title: 'Why a ledger is the right shape for a blog',
-          body: 'Most blogs bury the order posts were written in behind a busy grid. A ledger keeps the sequence honest \u2014 entry one, then two, then three \u2014 and lets the writing carry the page instead of a hero image.\n\nThis is the seed post. Register an account and write your own to replace it in the running order.',
-          author: 'ledger',
-          tag: 'meta',
-          createdAt: Date.now() - 1000 * 60 * 60 * 26,
-        },
-        {
-          id: cryptoId(),
-          title: 'Setting up a local front-end environment',
-          body: 'A minimal setup is enough to start: a code editor, a modern browser, and a way to serve static files locally so relative paths and fetch calls behave the way they will in production.\n\nNo build tools are required for a project like this one \u2014 plain HTML, CSS and JavaScript, opened straight in the browser.',
-          author: 'ledger',
-          tag: 'tooling',
-          createdAt: Date.now() - 1000 * 60 * 60 * 50,
-        },
-      ];
-      Store.savePosts(seed);
-    }
-  }
+  clearSession(){ localStorage.removeItem(DB_SESSION); localStorage.removeItem(DB_TOKEN); },
+  
+  getToken(){ return localStorage.getItem(DB_TOKEN); },
+  setToken(token){ localStorage.setItem(DB_TOKEN, token); },
+  clearToken(){ localStorage.removeItem(DB_TOKEN); }
 };
 
-function cryptoId(){
-  return 'p_' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
+// ========== API Helper ==========
+async function apiCall(endpoint, options = {}) {
+  const token = Store.getToken();
+  const headers = {
+    'Content-Type': 'application/json',
+    ...options.headers
+  };
+  
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  const response = await fetch(`${API_URL}${endpoint}`, {
+    ...options,
+    headers
+  });
+
+  const data = await response.json();
+  
+  if (!response.ok) {
+    throw new Error(data.message || 'Something went wrong');
+  }
+  
+  return data;
 }
 
+// ========== Auth APIs ==========
+async function registerUser(name, email, password) {
+  const data = await apiCall('/auth/register', {
+    method: 'POST',
+    body: JSON.stringify({ name, email, password })
+  });
+  if (data.token) {
+    Store.setToken(data.token);
+  }
+  return data;
+}
+
+async function loginUser(email, password) {
+  const data = await apiCall('/auth/login', {
+    method: 'POST',
+    body: JSON.stringify({ email, password })
+  });
+  if (data.token) {
+    Store.setToken(data.token);
+  }
+  return data;
+}
+
+async function getCurrentUser() {
+  try {
+    const data = await apiCall('/auth/me');
+    return data.user;
+  } catch {
+    return null;
+  }
+}
+
+// ========== Posts APIs ==========
+async function createPost(title, body, tag) {
+  const data = await apiCall('/posts', {
+    method: 'POST',
+    body: JSON.stringify({ title, body, tag })
+  });
+  return data.post;
+}
+
+async function getAllPosts() {
+  const data = await apiCall('/posts');
+  return data.posts || [];
+}
+
+async function getMyPosts() {
+  const data = await apiCall('/posts/my/posts');
+  return data.posts || [];
+}
+
+async function deletePost(postId) {
+  await apiCall(`/posts/${postId}`, {
+    method: 'DELETE'
+  });
+}
+
+// ========== User Functions ==========
 function currentUser(){
   const s = Store.session();
   if(!s) return null;
-  return Store.users().find(u => u.email === s.email) || null;
+  return s;
 }
 
-function requireAuth(redirectTo = 'login.html'){
-  const u = currentUser();
-  if(!u){ window.location.href = redirectTo; }
-  return u;
+async function requireAuth(redirectTo = 'login.html'){
+  const user = currentUser();
+  if(!user){
+    window.location.href = redirectTo;
+    return null;
+  }
+  try {
+    const backendUser = await getCurrentUser();
+    if(!backendUser){
+      Store.clearSession();
+      Store.clearToken();
+      window.location.href = redirectTo;
+      return null;
+    }
+    return { ...user, ...backendUser };
+  } catch {
+    Store.clearSession();
+    Store.clearToken();
+    window.location.href = redirectTo;
+    return null;
+  }
+}
+
+// ========== Utility Functions ==========
+function cryptoId(){
+  return 'p_' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
 }
 
 function timeAgo(ts){
@@ -74,18 +150,19 @@ function timeAgo(ts){
 }
 
 function escapeHtml(str){
+  if (!str) return '';
   const div = document.createElement('div');
   div.textContent = str;
   return div.innerHTML;
 }
 
 function excerpt(body, len = 140){
+  if (!body) return '';
   const clean = body.replace(/\s+/g, ' ').trim();
   return clean.length > len ? clean.slice(0, len).trim() + '\u2026' : clean;
 }
 
-/* ------------------------------- nav / header ------------------------------- */
-
+// ========== Navigation ==========
 function renderNav(activePage){
   const nav = document.querySelector('[data-nav]');
   if(!nav) return;
@@ -114,6 +191,7 @@ function renderNav(activePage){
     logout.addEventListener('click', (e) => {
       e.preventDefault();
       Store.clearSession();
+      Store.clearToken();
       window.location.href = 'index.html';
     });
     nav.appendChild(logout);
@@ -121,5 +199,5 @@ function renderNav(activePage){
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-  Store.seedIfEmpty();
+  // No need to seed anymore - backend handles seed
 });

@@ -47,62 +47,74 @@
 <script src="app.js"></script>
 <script>
   renderNav('dashboard');
-  const user = requireAuth();
+  
+  let currentUserData = null;
 
-  function myPosts(){
-    const name = user.name || user.email;
-    return Store.posts().filter(p => p.author === name).sort((a,b) => b.createdAt - a.createdAt);
-  }
-
-  function render(){
+  async function init() {
+    const user = await requireAuth();
     if(!user) return;
-    document.getElementById('greeting').textContent = 'Welcome back, ' + (user.name || user.email).split(' ')[0] + '.';
-
-    const posts = myPosts();
-    const wrap = document.getElementById('entries');
-    const empty = document.getElementById('empty');
-
-    document.getElementById('stat-total').textContent = posts.length;
-    const totalWords = posts.reduce((sum, p) => sum + p.body.trim().split(/\s+/).filter(Boolean).length, 0);
-    document.getElementById('stat-words').textContent = totalWords;
-    document.getElementById('stat-latest').textContent = posts.length ? timeAgo(posts[0].createdAt) : '—';
-    document.getElementById('entry-count').textContent = posts.length;
-
-    if(posts.length === 0){
-      wrap.innerHTML = '';
-      empty.style.display = 'block';
-      return;
-    }
-    empty.style.display = 'none';
-
-    wrap.innerHTML = posts.map((p, i) => {
-      const num = String(posts.length - i).padStart(3, '0');
-      return `
-        <article class="entry">
-          <div class="num">${num}</div>
-          <div>
-            <h2 class="title">${escapeHtml(p.title)}</h2>
-            <p class="excerpt">${escapeHtml(excerpt(p.body))}</p>
-            <div class="meta"><span class="tag">#${escapeHtml(p.tag || 'general')}</span> · ${timeAgo(p.createdAt)}</div>
-            <div class="dash-entry-actions">
-              <button data-delete="${p.id}">Delete entry</button>
-            </div>
-          </div>
-          <div class="side"></div>
-        </article>`;
-    }).join('');
-
-    wrap.querySelectorAll('[data-delete]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        if(!confirm('Remove this entry from the ledger? This can\u2019t be undone.')) return;
-        const remaining = Store.posts().filter(p => p.id !== btn.dataset.delete);
-        Store.savePosts(remaining);
-        render();
-      });
-    });
+    currentUserData = user;
+    Store.setSession(user.email);
+    await render();
   }
 
-  render();
+  async function render() {
+    if(!currentUserData) return;
+    
+    document.getElementById('greeting').textContent = 'Welcome back, ' + (currentUserData.name || currentUserData.email).split(' ')[0] + '.';
+
+    try {
+      const posts = await getMyPosts();
+      const wrap = document.getElementById('entries');
+      const empty = document.getElementById('empty');
+
+      document.getElementById('stat-total').textContent = posts.length;
+      const totalWords = posts.reduce((sum, p) => sum + (p.body || '').trim().split(/\s+/).filter(Boolean).length, 0);
+      document.getElementById('stat-words').textContent = totalWords;
+      document.getElementById('stat-latest').textContent = posts.length ? timeAgo(posts[0].createdAt) : '—';
+      document.getElementById('entry-count').textContent = posts.length;
+
+      if(posts.length === 0){
+        wrap.innerHTML = '';
+        empty.style.display = 'block';
+        return;
+      }
+      empty.style.display = 'none';
+
+      wrap.innerHTML = posts.map((p, i) => {
+        const num = String(posts.length - i).padStart(3, '0');
+        return `
+          <article class="entry">
+            <div class="num">${num}</div>
+            <div>
+              <h2 class="title">${escapeHtml(p.title)}</h2>
+              <p class="excerpt">${escapeHtml(excerpt(p.body))}</p>
+              <div class="meta"><span class="tag">#${escapeHtml(p.tag || 'general')}</span> · ${timeAgo(new Date(p.createdAt).getTime())}</div>
+              <div class="dash-entry-actions">
+                <button data-delete="${p._id}">Delete entry</button>
+              </div>
+            </div>
+            <div class="side"></div>
+          </article>`;
+      }).join('');
+
+      wrap.querySelectorAll('[data-delete]').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          if(!confirm('Remove this entry from the ledger? This can\u2019t be undone.')) return;
+          try {
+            await deletePost(btn.dataset.delete);
+            await render();
+          } catch (error) {
+            alert('Error deleting post: ' + error.message);
+          }
+        });
+      });
+    } catch (error) {
+      console.error('Error loading posts:', error);
+    }
+  }
+
+  init();
 </script>
 </body>
 </html>

@@ -62,7 +62,14 @@
 <script src="app.js"></script>
 <script>
   renderNav('create');
-  const user = requireAuth();
+  
+  // Check authentication
+  (async function checkAuth() {
+    const user = await requireAuth();
+    if(!user) return;
+    // Store user info for later use
+    window._currentUser = user;
+  })();
 
   const bodyField = document.getElementById('body');
   const count = document.getElementById('count');
@@ -71,7 +78,7 @@
   const form = document.getElementById('post-form');
   const banner = document.getElementById('banner');
 
-  form.addEventListener('submit', (e) => {
+  form.addEventListener('submit', async (e) => {
     e.preventDefault();
     banner.classList.remove('show');
 
@@ -88,18 +95,13 @@
 
     if(!valid) return;
 
-    const posts = Store.posts();
-    posts.push({
-      id: cryptoId(),
-      title,
-      body,
-      tag,
-      author: user.name || user.email,
-      createdAt: Date.now()
-    });
-    Store.savePosts(posts);
-
-    window.location.href = 'dashboard.html';
+    try {
+      await createPost(title, body, tag);
+      window.location.href = 'dashboard.html';
+    } catch (error) {
+      banner.textContent = error.message;
+      banner.classList.add('show');
+    }
   });
 </script>
 </body>

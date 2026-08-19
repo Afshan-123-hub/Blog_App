@@ -50,13 +50,19 @@
 <script>
   renderNav('login');
 
-  // If already logged in, go straight to the dashboard.
-  if(currentUser()){ window.location.href = 'dashboard.html'; }
+  // If already logged in, go to dashboard
+  (async function checkAuth() {
+    const user = await getCurrentUser();
+    if(user){ 
+      Store.setSession(user.email);
+      window.location.href = 'dashboard.html'; 
+    }
+  })();
 
   const form = document.getElementById('login-form');
   const banner = document.getElementById('banner');
 
-  form.addEventListener('submit', (e) => {
+  form.addEventListener('submit', async (e) => {
     e.preventDefault();
     banner.classList.remove('show');
 
@@ -73,15 +79,14 @@
 
     if(!valid) return;
 
-    const user = Store.users().find(u => u.email === email);
-    if(!user || user.password !== password){
-      banner.textContent = 'That email and password don\u2019t match an account here.';
+    try {
+      const data = await loginUser(email, password);
+      Store.setSession(email);
+      window.location.href = 'dashboard.html';
+    } catch (error) {
+      banner.textContent = error.message;
       banner.classList.add('show');
-      return;
     }
-
-    Store.setSession(email);
-    window.location.href = 'dashboard.html';
   });
 </script>
 </body>
